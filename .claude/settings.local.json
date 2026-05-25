@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-ItemProperty 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\App Paths\\\\chrome.exe' | Select-Object -ExpandProperty '\\(Default\\)'\")",
+      "Bash(powershell -Command \"Start-Process 'C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe' -ArgumentList '--load-extension=\\\\\"e:\\\\projetos\\\\extension\\\\\"'\")",
+      "Bash(\"C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe\" \"chrome://extensions\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"e:\\\\projetos\\\\extension\\\\reload_ext.ps1\")",
+      "PowerShell(explorer.exe \"e:\\\\projetos\")",
+      "PowerShell(Get-ChildItem \"C:\\\\\", \"$env:LOCALAPPDATA\", \"$env:APPDATA\", \"C:\\\\Program Files\", \"C:\\\\Program Files \\(x86\\)\" -Recurse -Filter \"git.exe\" -ErrorAction SilentlyContinue -Depth 5 | Select-Object -First 5 -ExpandProperty FullName)",
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue)",
+      "PowerShell(winget --version)",
+      "PowerShell(winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements)"
+    ]
+  }
+}

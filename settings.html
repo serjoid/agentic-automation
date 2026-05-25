@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurações — Agentic</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #0b1220;
+      --primary: #38bdf8;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --border: rgba(255,255,255,0.08);
+      --accent: #818cf8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container { max-width: 600px; width: 100%; }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo {
+      width: 26px; height: 26px;
+      background: var(--primary);
+      border-radius: 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #06202a;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .section { margin-bottom: 24px; }
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    /* Provider cards */
+    .provider-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .provider-card {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--surface2);
+    }
+    .provider-card:hover { border-color: var(--muted); }
+    .provider-card.active { border-color: var(--primary); background: rgba(56,189,248,0.08); }
+    .provider-card .icon { font-size: 22px; margin-bottom: 4px; }
+    .provider-card .name { font-size: 12px; font-weight: 700; }
+    .provider-card .desc { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    /* Fields */
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="url"], input[type="password"], select, textarea {
+      width: 100%;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    textarea { min-height: 80px; resize: vertical; }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+    .hint a { color: var(--primary); text-decoration: none; }
+
+    .row { display: flex; gap: 10px; }
+    .row .field { flex: 1; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+    /* Toggle row */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-info .label { font-size: 13px; font-weight: 500; }
+    .toggle-info .sublabel { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .toggle {
+      position: relative;
+      width: 44px; height: 24px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider {
+      position: absolute; inset: 0;
+      background: #334155;
+      border-radius: 12px;
+      transition: background 0.2s;
+    }
+    .toggle .slider::before {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .slider { background: var(--primary); }
+    .toggle input:checked + .slider::before { transform: translateX(20px); }
+
+    /* Mode toggle warning */
+    .mode-warning {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: var(--warning);
+      margin-top: 8px;
+      display: none;
+    }
+    .mode-warning.visible { display: block; }
+
+    /* Actions */
+    .actions { display: flex; gap: 8px; margin-top: 20px; }
+    .btn {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn-primary { background: var(--primary); color: #06202a; }
+    .btn-secondary { background: #334155; color: var(--text); }
+
+    #feedback { margin-top: 12px; font-size: 13px; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><span class="logo">A</span> Configurações</h1>
+
+    <!-- Provider -->
+    <div class="section">
+      <div class="section-label">Provedor de IA</div>
+      <div class="provider-grid" id="providerGrid">
+        <div class="provider-card" data-provider="deepseek">
+          <div class="icon">🧠</div>
+          <div class="name">DeepSeek</div>
+          <div class="desc">deepseek-chat / reasoner</div>
+        </div>
+        <div class="provider-card" data-provider="openai">
+          <div class="icon">⚡</div>
+          <div class="name">OpenAI</div>
+          <div class="desc">GPT-5.4 / nano</div>
+        </div>
+        <div class="provider-card" data-provider="local">
+          <div class="icon">🖥️</div>
+          <div class="name">LM Studio</div>
+          <div class="desc">Servidor local</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connection -->
+    <div class="section">
+      <div class="section-label">Conexão</div>
+
+      <div class="field" id="endpointField">
+        <label for="apiEndpoint">URL da API</label>
+        <input id="apiEndpoint" type="url" placeholder="http://localhost:1234/v1" />
+        <div class="hint">Endpoint OpenAI-compatível. Ex.: <code>http://localhost:1234/v1</code></div>
+      </div>
+
+      <div class="field">
+        <label for="apiKey">Chave de API</label>
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+        <div class="hint" id="keyHint">
+          Obtenha em <a href="https://platform.deepseek.com/api_keys" target="_blank">platform.deepseek.com</a>.
+          Deixe vazio para LM Studio.
+        </div>
+      </div>
+    </div>
+
+    <!-- Model -->
+    <div class="section">
+      <div class="section-label">Modelo</div>
+      <div class="row">
+        <div class="field">
+          <label for="model">Modelo</label>
+          <select id="model">
+            <optgroup label="DeepSeek" id="optDeepSeek">
+              <option value="deepseek-v4-flash">deepseek-v4-flash (rápido)</option>
+              <option value="deepseek-v4-pro">deepseek-v4-pro (avançado)</option>
+            </optgroup>
+            <optgroup label="OpenAI — GPT-5.4" id="optOpenAI" style="display:none">
+              <option value="gpt-5.4">gpt-5.4</option>
+              <option value="gpt-5.4-mini">gpt-5.4-mini (rápido)</option>
+              <option value="gpt-5.4-nano">gpt-5.4-nano (mais leve)</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="o3">o3</option>
+            </optgroup>
+            <optgroup label="Local" id="optLocal" style="display:none">
+              <option value="local-model">local-model</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="field" id="customModelField" style="display:none">
+          <label for="customModel">Nome do modelo (LM Studio)</label>
+          <input id="customModel" type="text" placeholder="Ex.: llama-3.1-8b-instruct" />
+          <div class="hint">Exato nome conforme carregado no LM Studio.</div>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Behavior -->
+    <div class="section">
+      <div class="section-label">Comportamento</div>
+
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <div class="label">Modo Livre ⚡</div>
+          <div class="sublabel">Executa todas as ações sem pedir aprovação.</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="freeMode">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="mode-warning" id="modeWarning">
+        Atenção: em Modo Livre, o agente executa cliques, navegação e JavaScript sem confirmação.
+        Ative somente quando confiar totalmente na tarefa.
+      </div>
+
+      <div class="toggle-row" id="thinkingRow">
+        <div class="toggle-info">
+          <div class="label">Thinking Mode</div>
+          <div class="sublabel">Raciocínio interno antes de responder (DeepSeek R1).</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="thinkingEnabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- System prompt -->
+    <div class="section">
+      <div class="section-label">System Prompt</div>
+      <div class="field">
+        <textarea id="systemPrompt" placeholder="Instruções de comportamento para o agente..."></textarea>
+        <div class="hint">Deixe vazio para usar o padrão.</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="saveBtn">Salvar</button>
+      <button class="btn btn-secondary" id="resetBtn">Restaurar padrões</button>
+    </div>
+    <div id="feedback"></div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
