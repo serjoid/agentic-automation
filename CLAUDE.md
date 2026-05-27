@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Chrome Extension (Manifest V3) that enables AI-powered browser automation via a side panel chat interface. The AI agent can navigate pages, click elements, type text, execute JavaScript, and interact with the DOM. The LLM API (DeepSeek, OpenAI, or a local model) is called **directly from the Service Worker via `fetch`** — there is no Native Messaging Host.
+This is a Chrome Extension (Manifest V3) that enables AI-powered browser automation via a side panel chat interface. The AI agent can navigate pages, click elements, type text, execute JavaScript, and interact with the DOM. The LLM API (DeepSeek, OpenAI, LM Studio, or Ollama) is called **directly from the Service Worker via `fetch`** — there is no Native Messaging Host.
 
 ## Development
 
@@ -22,7 +22,8 @@ The extension has three runtime components that communicate via `chrome.runtime.
 The heart of the extension. Manages:
 - **LLM API calls** via `fetch` directly from the Service Worker (no external host)
 - **Chat loop**: sends messages → receives tool calls → executes tools → feeds results back
-- **27 browser automation tools** defined in `BROWSER_TOOLS` (navigation, DOM reading, interaction, export, screenshot, dialog handling, waits)
+- **25 browser automation tools** defined in `BROWSER_TOOLS` (navigation, DOM reading, interaction, export, screenshot, dialog handling, waits)
+- **System prompt profiles**: `SYSTEM_PROMPT_PROFILES` defines built-in profiles (`default`, `sei-sip`, `data-extraction`, `form-filling`). `getConfig()` resolves the active prompt from profile defaults, user overrides, and the legacy `systemPrompt` key.
 - **Vision support**: screenshot images are forwarded to the LLM only for vision-capable OpenAI models (`gpt-4o`, `gpt-4.1`, `o1`–`o5`, etc.); non-vision models receive a text fallback
 - **Chrome DevTools Protocol (CDP)** via the `debugger` API for JS evaluation and console capture
 - **Approval system**: sensitive actions (`navigate`, `click_element`, `type_text`, `evaluate_js`, `select_option`) require user confirmation with a 3-minute expiry window; skip in `auto` mode
@@ -35,7 +36,20 @@ Message types it handles: `agentic.chat`, `agentic.command`, `agentic.config.*`,
 Renders the conversation, sends user messages to the background, displays approval prompts, and shows connection status. Uses a nonce-based SHA-256 handshake with the background worker for sender verification. Includes a lightweight Markdown renderer.
 
 ### `settings.js` / `settings.html` — Configuration UI
-Persists to `chrome.storage.local`: `provider`, `apiEndpoint`, `apiKey`, `model`, `customModel`, `thinkingEnabled`, `systemPrompt`, `permissionMode`. Three provider presets: DeepSeek (default), OpenAI (`gpt-4o` default), LM Studio (local).
+Persists to `chrome.storage.local`: `provider`, `apiEndpoint`, `apiKey`, `model`, `customModel`, `thinkingEnabled`, `systemPromptProfile`, `systemPromptProfiles`, legacy `systemPrompt`, and `permissionMode`. Provider presets: DeepSeek (default), OpenAI (`gpt-4o` default), LM Studio (`http://localhost:1234/v1`), and Ollama (`http://localhost:11434/v1`).
+
+Prompt profile behavior:
+- `systemPromptProfile` stores the active profile id.
+- `systemPromptProfiles` stores user-edited prompt text by profile id.
+- `systemPrompt` is kept for backward compatibility with older installs and older background versions.
+- The default active profile is `sei-sip`, preserving the original administrative SEI/SIP behavior.
+- `settings.js` asks `agentic.config.get` for the prompt profile catalog so it does not need to duplicate the long SEI/SIP prompt.
+
+Ollama behavior:
+- Uses the OpenAI-compatible endpoint `http://localhost:11434/v1/chat/completions`.
+- Does not require an API key.
+- Uses a free-text model field; users should enter names from `ollama list`.
+- Vision is disabled by default for Ollama. `see_screen` returns a text fallback unless the active provider is OpenAI and `supportsVision()` recognizes the model.
 
 ### Data Flow
 ```
@@ -108,3 +122,6 @@ Skills installed via `/plugin` are global to Claude Code. The ones in `.claude/s
 | 5 | `background.js` | History trim now finds the first `user` message after slicing to avoid orphaned `tool` role messages that break the API contract |
 | 6 | `settings.js` | OpenAI preset model corrected from non-existent `gpt-5.4-nano` to `gpt-4o` |
 | 7 | `CLAUDE.md` | Removed outdated Native Messaging Host references; corrected permissions list; documented all improvements |
+| 8 | `background.js`, `settings.js`, `settings.html` | Added editable system prompt profiles (`default`, `sei-sip`, `data-extraction`, `form-filling`) with legacy `systemPrompt` compatibility |
+| 9 | `settings.js`, `settings.html` | Added Ollama provider preset using `http://localhost:11434/v1` and free-text local model names |
+| 10 | `README.md`, `CLAUDE.md`, `docs/superpowers/` | Documented prompt profile and Ollama architecture for future agents |

@@ -62,7 +62,7 @@
     }
 
     /* Provider cards */
-    .provider-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .provider-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
     .provider-card {
       border: 2px solid var(--border);
       border-radius: 12px;
@@ -174,6 +174,15 @@
     .btn:hover { opacity: 0.9; }
     .btn-primary { background: var(--primary); color: #06202a; }
     .btn-secondary { background: #334155; color: var(--text); }
+    .btn-small { padding: 8px 12px; font-size: 12px; }
+
+    .prompt-toolbar {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .prompt-toolbar .field { flex: 1; margin-bottom: 0; }
 
     #feedback { margin-top: 12px; font-size: 13px; min-height: 20px; }
   </style>
@@ -201,6 +210,11 @@
           <div class="name">LM Studio</div>
           <div class="desc">Servidor local</div>
         </div>
+        <div class="provider-card" data-provider="ollama">
+          <div class="icon">O</div>
+          <div class="name">Ollama</div>
+          <div class="desc">localhost:11434</div>
+        </div>
       </div>
     </div>
 
@@ -219,7 +233,7 @@
         <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
         <div class="hint" id="keyHint">
           Obtenha em <a href="https://platform.deepseek.com/api_keys" target="_blank">platform.deepseek.com</a>.
-          Deixe vazio para LM Studio.
+          Deixe vazio para LM Studio ou Ollama.
         </div>
       </div>
     </div>
@@ -245,12 +259,15 @@
             <optgroup label="Local" id="optLocal" style="display:none">
               <option value="local-model">local-model</option>
             </optgroup>
+            <optgroup label="Ollama" id="optOllama" style="display:none">
+              <option value="llama3.1">llama3.1</option>
+            </optgroup>
           </select>
         </div>
         <div class="field" id="customModelField" style="display:none">
-          <label for="customModel">Nome do modelo (LM Studio)</label>
+          <label for="customModel" id="customModelLabel">Nome do modelo local</label>
           <input id="customModel" type="text" placeholder="Ex.: llama-3.1-8b-instruct" />
-          <div class="hint">Exato nome conforme carregado no LM Studio.</div>
+          <div class="hint" id="customModelHint">Exato nome conforme carregado no servidor local.</div>
         </div>
       </div>
     </div>
@@ -293,9 +310,17 @@
     <!-- System prompt -->
     <div class="section">
       <div class="section-label">System Prompt</div>
+      <div class="prompt-toolbar">
+        <div class="field">
+          <label for="systemPromptProfile">Perfil de prompt</label>
+          <select id="systemPromptProfile"></select>
+          <div class="hint" id="systemPromptProfileHint">Escolha o comportamento base do agente.</div>
+        </div>
+        <button class="btn btn-secondary btn-small" id="resetPromptBtn">Restaurar perfil</button>
+      </div>
       <div class="field">
         <textarea id="systemPrompt" placeholder="Instruções de comportamento para o agente..."></textarea>
-        <div class="hint">Deixe vazio para usar o padrão.</div>
+        <div class="hint">Edite o prompt do perfil selecionado. O texto fica salvo por perfil.</div>
       </div>
     </div>
 

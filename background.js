@@ -302,6 +302,50 @@ When an action fails or produces unexpected results:
 - **Pergunte quando bloqueado**: se precisar de uma URL, credencial ou decisão, pergunte claramente e aguarde. Nunca adivinhe.
 - **Comunique em português** — os usuários são servidores públicos brasileiros.`;
 
+  const GENERAL_SYSTEM_PROMPT = `You are a helpful browser automation assistant with full access to the user's browser. You can navigate pages, click elements, type text, extract data, run JavaScript, export files, and help the user complete browser tasks efficiently.
+
+Always start by understanding the current tab context. Prefer safe, reversible actions. Ask for confirmation before consequential changes such as submitting forms, deleting data, changing account settings, or sending messages. Be concise in your final responses.`;
+
+  const DATA_EXTRACTION_SYSTEM_PROMPT = `You are a browser data extraction assistant. Your job is to inspect pages, identify structured data, extract it accurately, and export it in useful formats such as JSON, CSV, Markdown, or plain text.
+
+Prefer DOM-based extraction with get_page_content, find_elements, get_page_html, and evaluate_js before relying on screenshots. Preserve source context, labels, table headers, links, dates, and units. When data spans multiple pages, plan the pagination flow before exporting. Do not invent missing values.`;
+
+  const FORM_FILLING_SYSTEM_PROMPT = `You are a careful browser form-filling assistant. Your priority is accuracy, validation, and avoiding unintended submission.
+
+Before filling a form, inspect labels, required fields, field formats, and any autocomplete behavior. After typing or selecting values, verify that the page accepted the value. Never submit a form with real-world consequences until the user explicitly confirms the final values.`;
+
+  const SYSTEM_PROMPT_PROFILES = {
+    default: {
+      label: 'Automação geral',
+      description: 'Navegação, leitura, cliques e tarefas comuns no navegador.',
+      prompt: GENERAL_SYSTEM_PROMPT
+    },
+    'sei-sip': {
+      label: 'SEI/SIP administrativo',
+      description: 'Rotinas SEI/SIP, segurança institucional e domínio administrativo brasileiro.',
+      prompt: DEFAULT_SYSTEM_PROMPT
+    },
+    'data-extraction': {
+      label: 'Extração de dados',
+      description: 'Coleta estruturada de páginas, tabelas e listas, com exportação.',
+      prompt: DATA_EXTRACTION_SYSTEM_PROMPT
+    },
+    'form-filling': {
+      label: 'Preenchimento de formulários',
+      description: 'Preenchimento cauteloso, validação e confirmação antes de envio.',
+      prompt: FORM_FILLING_SYSTEM_PROMPT
+    }
+  };
+
+  const DEFAULT_SYSTEM_PROMPT_PROFILE = 'sei-sip';
+
+  const PROVIDER_DEFAULTS = {
+    deepseek: { endpoint: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash' },
+    openai: { endpoint: 'https://api.openai.com/v1', model: 'gpt-4o' },
+    local: { endpoint: 'http://localhost:1234/v1', model: 'local-model' },
+    ollama: { endpoint: 'http://localhost:11434/v1', model: 'llama3.1' }
+  };
+
   const BROWSER_TOOLS = [
     // ── Context & Navigation ──────────────────────────────────────────────────
     {
@@ -631,18 +675,58 @@ When an action fails or produces unexpected results:
   }
 
   // ======== Config ============================================================
+  function getPromptProfileCatalog() {
+    return Object.fromEntries(
+      Object.entries(SYSTEM_PROMPT_PROFILES).map(([id, profile]) => [id, {
+        label: profile.label,
+        description: profile.description,
+        prompt: profile.prompt
+      }])
+    );
+  }
+
+  function normalizePromptOverrides(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const normalized = {};
+    for (const [id, prompt] of Object.entries(value)) {
+      if (SYSTEM_PROMPT_PROFILES[id] && typeof prompt === 'string') normalized[id] = prompt;
+    }
+    return normalized;
+  }
+
+  function resolveSystemPrompt(profileId, overrides, legacyPrompt) {
+    const selectedProfile = SYSTEM_PROMPT_PROFILES[profileId] ? profileId : DEFAULT_SYSTEM_PROMPT_PROFILE;
+    const trimmedOverride = overrides[selectedProfile]?.trim();
+    if (trimmedOverride) return trimmedOverride;
+
+    // Backward compatibility for installs that saved the single old systemPrompt field.
+    const trimmedLegacy = typeof legacyPrompt === 'string' ? legacyPrompt.trim() : '';
+    if (selectedProfile === DEFAULT_SYSTEM_PROMPT_PROFILE && trimmedLegacy) return trimmedLegacy;
+
+    return SYSTEM_PROMPT_PROFILES[selectedProfile].prompt;
+  }
+
   async function getConfig() {
     const cfg = await chrome.storage.local.get([
       'provider', 'apiEndpoint', 'apiKey', 'model',
-      'thinkingEnabled', 'systemPrompt', 'permissionMode'
+      'thinkingEnabled', 'systemPrompt', 'systemPromptProfile',
+      'systemPromptProfiles', 'permissionMode'
     ]);
+    const systemPromptProfile = SYSTEM_PROMPT_PROFILES[cfg.systemPromptProfile]
+      ? cfg.systemPromptProfile
+      : DEFAULT_SYSTEM_PROMPT_PROFILE;
+    const systemPromptProfiles = normalizePromptOverrides(cfg.systemPromptProfiles);
+    const provider = PROVIDER_DEFAULTS[cfg.provider] ? cfg.provider : 'deepseek';
+    const providerDefaults = PROVIDER_DEFAULTS[provider];
     return {
-      provider:       cfg.provider       || 'deepseek',
-      apiEndpoint:    cfg.apiEndpoint    || 'https://api.deepseek.com/v1',
+      provider,
+      apiEndpoint:    cfg.apiEndpoint    || providerDefaults.endpoint,
       apiKey:         cfg.apiKey         || '',
-      model:          cfg.model          || 'deepseek-v4-flash',
+      model:          cfg.model          || providerDefaults.model,
       thinkingEnabled:cfg.thinkingEnabled ?? false,
-      systemPrompt:   cfg.systemPrompt   || DEFAULT_SYSTEM_PROMPT,
+      systemPrompt:   resolveSystemPrompt(systemPromptProfile, systemPromptProfiles, cfg.systemPrompt),
+      systemPromptProfile,
+      systemPromptProfiles,
       permissionMode: cfg.permissionMode || 'ask'
     };
   }
@@ -1286,8 +1370,25 @@ When an action fails or produces unexpected results:
     }
 
     if (type === 'agentic.config.get') {
-      chrome.storage.local.get(['provider','apiEndpoint','apiKey','model','thinkingEnabled','systemPrompt','permissionMode'])
-        .then(cfg => sendResponse({ ok: true, config: cfg }));
+      chrome.storage.local.get([
+        'provider', 'apiEndpoint', 'apiKey', 'model', 'customModel',
+        'thinkingEnabled', 'systemPrompt', 'systemPromptProfile',
+        'systemPromptProfiles', 'permissionMode'
+      ])
+        .then(async rawCfg => {
+          const resolvedCfg = await getConfig();
+          sendResponse({
+            ok: true,
+            config: {
+              ...rawCfg,
+              systemPromptProfile: resolvedCfg.systemPromptProfile,
+              systemPromptProfiles: normalizePromptOverrides(rawCfg.systemPromptProfiles),
+              resolvedSystemPrompt: resolvedCfg.systemPrompt
+            },
+            promptProfiles: getPromptProfileCatalog()
+          });
+        })
+        .catch(err => sendResponse({ ok: false, error: err?.message || String(err) }));
       return true;
     }
 

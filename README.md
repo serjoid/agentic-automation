@@ -17,7 +17,8 @@ A Chrome extension that lets you control your browser through a conversational A
 - **Approval system** — sensitive actions (navigation, JS execution, form submission) can require your confirmation before executing
 - **Free mode** — toggle off approvals for fully autonomous operation
 - **Thinking blocks** — collapsible view of the model's internal reasoning (for models that support it)
-- **Multiple AI providers** — DeepSeek, OpenAI, or any local model via LM Studio
+- **Multiple AI providers** — DeepSeek, OpenAI, LM Studio, or Ollama
+- **Prompt profiles** — choose and edit task-specific system prompts for general automation, SEI/SIP, data extraction, or form filling
 
 ---
 
@@ -82,7 +83,31 @@ User message → sidepanel.js → background.js → LLM API
 |---|---|---|
 | DeepSeek | `https://api.deepseek.com/v1` | Default. Cost-effective. |
 | OpenAI | `https://api.openai.com/v1` | GPT-4o enables vision (screenshots) |
-| LM Studio | `http://localhost:1234/v1` | Local models, no API key needed |
+| LM Studio | `http://localhost:1234/v1` | Local OpenAI-compatible server, no API key needed |
+| Ollama | `http://localhost:11434/v1` | Local OpenAI-compatible endpoint, no API key needed; use model names from `ollama list` |
+
+Vision (`see_screen`) is enabled only for OpenAI models recognized as vision-capable. Local providers such as LM Studio and Ollama currently receive a text fallback.
+
+---
+
+## System Prompt Profiles
+
+The settings page includes editable prompt profiles:
+
+| Profile | Use case |
+|---|---|
+| Automação geral | General browser automation |
+| SEI/SIP administrativo | Brazilian public-sector SEI/SIP workflows and safety rules |
+| Extração de dados | Structured extraction, pagination, and exports |
+| Preenchimento de formulários | Careful form completion and validation before submission |
+
+Settings are stored in `chrome.storage.local`:
+
+| Key | Purpose |
+|---|---|
+| `systemPromptProfile` | Active profile id |
+| `systemPromptProfiles` | User-edited prompt text keyed by profile id |
+| `systemPrompt` | Legacy single-prompt key kept for compatibility |
 
 ---
 
