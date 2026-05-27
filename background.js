@@ -648,7 +648,8 @@ When an action fails or produces unexpected results:
   }
 
   // ======== Vision support ====================================================
-  const VISION_MODELS = ['gpt-4o', 'gpt-4-turbo', 'gpt-5', 'o1', 'o3', 'o4'];
+  // Prefix-match: gpt-4o covers gpt-4o-mini, gpt-4o-2024-*, etc.
+  const VISION_MODELS = ['gpt-4o', 'gpt-4-turbo', 'gpt-4.1', 'gpt-5', 'o1', 'o2', 'o3', 'o4', 'o5'];
 
   function supportsVision(cfg) {
     if (cfg.provider !== 'openai') return false;
@@ -679,15 +680,44 @@ When an action fails or produces unexpected results:
 
     const body = { model: cfg.model, messages: sanitizeMessages(messages, cfg), tools: BROWSER_TOOLS, tool_choice: 'auto', stream: false };
 
-    const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body), signal: session.abortController?.signal });
+    const MAX_RETRIES = 3;
+    let lastErr;
 
-    if (!response.ok) {
-      let text = '';
-      try { text = await response.text(); } catch (_) {}
-      throw new Error(`API ${response.status}: ${text.slice(0, 300)}`);
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      if (session.abortController?.signal.aborted) throw new Error('Parado pelo usuário');
+
+      if (attempt > 0) {
+        // Exponential backoff: 1 s, 2 s, 4 s
+        await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, attempt - 1), 8000)));
+      }
+
+      let response;
+      try {
+        response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body), signal: session.abortController?.signal });
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        lastErr = err;
+        continue;
+      }
+
+      // Retryable: rate-limit or server errors
+      if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
+        let text = '';
+        try { text = await response.text(); } catch (_) {}
+        lastErr = new Error(`API ${response.status}: ${text.slice(0, 300)}`);
+        continue;
+      }
+
+      if (!response.ok) {
+        let text = '';
+        try { text = await response.text(); } catch (_) {}
+        throw new Error(`API ${response.status}: ${text.slice(0, 300)}`);
+      }
+
+      return response.json();
     }
 
-    return response.json();
+    throw lastErr;
   }
 
   // ======== UI Broadcast ======================================================
@@ -763,7 +793,12 @@ When an action fails or produces unexpected results:
 
       const MAX_HISTORY = 60;
       if (session.conversationHistory.length > MAX_HISTORY) {
-        session.conversationHistory = session.conversationHistory.slice(-MAX_HISTORY);
+        let trimmed = session.conversationHistory.slice(-MAX_HISTORY);
+        // Always start at the first user message to avoid orphaned tool results
+        // that would break the tool_calls ↔ tool role contract required by the API
+        const firstUser = trimmed.findIndex(m => m.role === 'user');
+        if (firstUser > 0) trimmed = trimmed.slice(firstUser);
+        session.conversationHistory = trimmed;
       }
 
       const messages = [];
@@ -1087,6 +1122,10 @@ When an action fails or produces unexpected results:
       }
 
       case 'see_screen': {
+        const cfg = await getConfig();
+        if (!supportsVision(cfg)) {
+          return 'Screenshot não disponível: o modelo atual não suporta visão. Use get_page_content ou find_elements para ler o estado da página.';
+        }
         const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
         const base64 = dataUrl.split(',')[1];
         return { __vision__: true, base64, mimeType: 'image/png' };
@@ -1164,7 +1203,15 @@ When an action fails or produces unexpected results:
     if (!ok) {
       const result = await chrome.scripting.executeScript({
         target: { tabId },
-        func: (expr) => { try { return JSON.stringify(eval(expr)); } catch (e) { return 'Error: ' + e.message; } },
+        // eslint-disable-next-line no-new-func
+        func: (expr) => {
+          try {
+            // Function avoids leaking wrapper-scope variables; supports expressions
+            return JSON.stringify(new Function(`"use strict"; return (${expr})`)());
+          } catch (_) {
+            try { return JSON.stringify(eval(expr)); } catch (e) { return 'Error: ' + e.message; }
+          }
+        },
         args: [expression],
         world: 'MAIN'
       });

@@ -10,7 +10,7 @@
     },
     openai: {
       endpoint: 'https://api.openai.com/v1',
-      model: 'gpt-5.4-nano',
+      model: 'gpt-4o',
       endpointEditable: false,
       keyHint: 'Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>.'
     },

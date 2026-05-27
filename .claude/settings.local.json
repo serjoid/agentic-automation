@@ -9,7 +9,15 @@
       "PowerShell(Get-ChildItem \"C:\\\\\", \"$env:LOCALAPPDATA\", \"$env:APPDATA\", \"C:\\\\Program Files\", \"C:\\\\Program Files \\(x86\\)\" -Recurse -Filter \"git.exe\" -ErrorAction SilentlyContinue -Depth 5 | Select-Object -First 5 -ExpandProperty FullName)",
       "PowerShell(Get-Command gh -ErrorAction SilentlyContinue)",
       "PowerShell(winget --version)",
-      "PowerShell(winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements)"
+      "PowerShell(winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(claude --version)",
+      "Bash(claude plugin *)",
+      "Bash(mkdir -p \"e:/projetos/extension/.claude/skills/webapp-testing/scripts\" \"e:/projetos/extension/.claude/skills/webapp-testing/examples\" \"e:/projetos/extension/.claude/skills/frontend-design\")"
+    ],
+    "additionalDirectories": [
+      "e:\\projetos\\extension\\.claude\\skills\\webapp-testing"
     ]
   }
 }
