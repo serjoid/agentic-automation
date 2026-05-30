@@ -12,68 +12,13 @@
   const modeIcon   = document.getElementById('modeIcon');
   const modeLabel  = document.getElementById('modeLabel');
   const statusDot  = document.getElementById('statusDot');
+  const pinnedTabEl    = document.getElementById('pinnedTab');
+  const pinnedTabLabel = document.getElementById('pinnedTabLabel');
 
   let isProcessing = false;
   let permissionMode = 'ask'; // 'ask' | 'auto'
 
-  // ======== Markdown renderer (lightweight) ====================================
-  function renderMarkdown(text) {
-    if (!text) return '';
-    let html = escapeHtml(text);
-
-    // Code blocks (``` ... ```)
-    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
-      `<pre><code>${code.trim()}</code></pre>`
-    );
-
-    // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    // Headers
-    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
-    html = html.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
-
-    // Bold / italic
-    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-    html = html.replace(/\*\*(.+?)\*\*/g,     '<strong>$1</strong>');
-    html = html.replace(/\*(.+?)\*/g,         '<em>$1</em>');
-
-    // Unordered lists
-    html = html.replace(/((?:^[-•] .+(?:\n|$))+)/gm, block => {
-      const items = block.trim().split('\n').map(l => `<li>${l.replace(/^[-•] /, '')}</li>`).join('');
-      return `<ul>${items}</ul>`;
-    });
-
-    // Ordered lists
-    html = html.replace(/((?:^\d+\. .+(?:\n|$))+)/gm, block => {
-      const items = block.trim().split('\n').map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`).join('');
-      return `<ol>${items}</ol>`;
-    });
-
-    // Links
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-
-    // Paragraphs (double newline)
-    html = html.replace(/\n{2,}/g, '</p><p>');
-    html = `<p>${html}</p>`;
-
-    // Single newlines
-    html = html.replace(/(?<!>)\n(?!<)/g, '<br>');
-
-    // Clean up empty paragraphs
-    html = html.replace(/<p>\s*<\/p>/g, '');
-
-    return html;
-  }
-
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
+  // ======== Markdown renderer and escapeHtml are now imported from utils.js =====
 
   // ======== DOM helpers ========================================================
   function scrollToBottom() {
@@ -265,6 +210,18 @@
       hideThinking();
       addApproval({ txId: msg.txId, action: msg.action, detail: msg.detail });
     }
+
+    // Tab isolation events
+    if (msg.type === 'chat.tab_pinned') {
+      setPinnedTab(msg.title || msg.url || `Tab ${msg.tabId}`);
+    }
+    if (msg.type === 'chat.tab_unpinned') {
+      clearPinnedTab();
+    }
+    if (msg.type === 'chat.tab_lost') {
+      clearPinnedTab();
+      addError('A aba da sessão foi fechada. Limpe a conversa para reiniciar.');
+    }
   });
 
   // ======== UI events ==========================================================
@@ -294,6 +251,8 @@
 
   clearBtn.addEventListener('click', async () => {
     chatArea.innerHTML = '';
+    clearPinnedTab();
+    showWelcome();
     await chrome.runtime.sendMessage({ type: 'agentic.command', payload: { command: 'clear.history' } }).catch(() => {});
   });
 
@@ -301,8 +260,36 @@
     chrome.runtime.openOptionsPage?.();
   });
 
+  // ======== Pinned tab badge ===================================================
+  function setPinnedTab(label) {
+    pinnedTabLabel.textContent = label;
+    pinnedTabEl.classList.add('visible');
+  }
+
+  function clearPinnedTab() {
+    pinnedTabLabel.textContent = '--';
+    pinnedTabEl.classList.remove('visible');
+  }
+
+  // ======== Onboarding =========================================================
+  function showWelcome() {
+    if (chatArea.children.length > 0) return;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'msg assistant';
+    wrapper.id = 'welcomeMsg';
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.innerHTML = `
+      <p><strong>👋 Olá!</strong> Sou o Agentic, seu assistente de automação.</p>
+      <p>Digite uma tarefa em linguagem natural — eu navego, clico, preencho formulários e extraío dados na aba atual.</p>
+      <p>Exemplos: <em>"Extraia os dados da tabela"</em>, <em>"Preencha o formulário com..."</em></p>`;
+    wrapper.appendChild(bubble);
+    chatArea.appendChild(wrapper);
+  }
+
   // ======== Init ===============================================================
   loadMode();
+  showWelcome();
 
   chrome.runtime.sendMessage({ type: 'agentic.handshake' }).then(() => {
     statusDot.classList.add('ok');

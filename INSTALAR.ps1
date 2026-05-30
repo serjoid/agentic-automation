@@ -14,18 +14,22 @@ $dest = "$env:LOCALAPPDATA\AgenticAutomation"
 
 # Copia os arquivos da extensao para AppData (pasta permanente)
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$extSrc = Join-Path $scriptDir "extensao"
+$extSrc = $scriptDir
 
-if (-not (Test-Path $extSrc)) {
-    Write-Host "[ERRO] Pasta 'extensao' nao encontrada." -ForegroundColor Red
-    Write-Host "Certifique-se de que extraiu o ZIP completo antes de executar este script." -ForegroundColor Yellow
+# Verifica se o manifest.json existe no diretório (garante que é a pasta da extensão)
+if (-not (Test-Path (Join-Path $extSrc "manifest.json"))) {
+    Write-Host "[ERRO] Arquivo 'manifest.json' nao encontrado no diretorio do script." -ForegroundColor Red
+    Write-Host "Certifique-se de que este script esta na raiz da extensao." -ForegroundColor Yellow
     Read-Host "Pressione Enter para sair"
     exit 1
 }
 
 Write-Host "Copiando arquivos para: $dest" -ForegroundColor White
 if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-Copy-Item $extSrc $dest -Recurse
+New-Item -ItemType Directory -Force -Path $dest > $null
+Get-ChildItem -Path $extSrc | Where-Object { $_.Name -notmatch '^node_modules$|^\.git$|^\.vscode$|^tests$|^package\.json$|^package-lock\.json$|^vitest\.config\.js$' } | ForEach-Object {
+    Copy-Item $_.FullName -Destination $dest -Recurse
+}
 
 Write-Host "[OK] Arquivos copiados." -ForegroundColor Green
 Write-Host ""

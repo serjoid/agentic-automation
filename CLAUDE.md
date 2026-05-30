@@ -23,12 +23,15 @@ The heart of the extension. Manages:
 - **LLM API calls** via `fetch` directly from the Service Worker (no external host)
 - **Chat loop**: sends messages → receives tool calls → executes tools → feeds results back
 - **25 browser automation tools** defined in `BROWSER_TOOLS` (navigation, DOM reading, interaction, export, screenshot, dialog handling, waits)
+- **Tab isolation (pinning)**: the agent is pinned to the tab where the first message is sent. All tool executions target the pinned tab, not the currently active one. `switch_tab` is blocked, `new_tab` always requires approval (even in auto mode), `captureVisibleTab` validates the pinned tab is active first, and `evaluate_js` blocks navigation-escape patterns (`window.open`, `location.href`, etc.)
+- **Input isolation**: CDP event listeners only process events from the pinned tab. `ensureDevTools` refuses to attach to non-pinned tabs.
+- **Session persistence**: critical state (`conversationHistory`, `pinnedTabId`, `consoleLogs`) is persisted to `chrome.storage.session` to survive Service Worker recycling. Vision base64 data is stripped before storage.
 - **System prompt profiles**: `SYSTEM_PROMPT_PROFILES` defines built-in profiles (`default`, `sei-sip`, `data-extraction`, `form-filling`). `getConfig()` resolves the active prompt from profile defaults, user overrides, and the legacy `systemPrompt` key.
 - **Vision support**: screenshot images are forwarded to the LLM only for vision-capable OpenAI models (`gpt-4o`, `gpt-4.1`, `o1`–`o5`, etc.); non-vision models receive a text fallback
 - **Chrome DevTools Protocol (CDP)** via the `debugger` API for JS evaluation and console capture
 - **Approval system**: sensitive actions (`navigate`, `click_element`, `type_text`, `evaluate_js`, `select_option`) require user confirmation with a 3-minute expiry window; skip in `auto` mode
 - **Retry/backoff**: `callLLM` retries up to 3× on HTTP 429 or 5xx with exponential backoff (1 s → 2 s → 4 s)
-- **Session state**: nonce, pending approvals, DevTools attachment status, conversation history (capped at 60 msgs; trim always starts at a `user` message to avoid orphaned `tool` roles)
+- **Session state**: nonce, pinned tab, pending approvals, DevTools attachment status, conversation history (capped at 60 msgs; trim always starts at a `user` message to avoid orphaned `tool` roles)
 
 Message types it handles: `agentic.chat`, `agentic.command`, `agentic.config.*`, `agentic.approval.*`, `agentic.handshake`, `agentic.stop`, `agentic.reload`, `agentic.status`
 
@@ -125,3 +128,28 @@ Skills installed via `/plugin` are global to Claude Code. The ones in `.claude/s
 | 8 | `background.js`, `settings.js`, `settings.html` | Added editable system prompt profiles (`default`, `sei-sip`, `data-extraction`, `form-filling`) with legacy `systemPrompt` compatibility |
 | 9 | `settings.js`, `settings.html` | Added Ollama provider preset using `http://localhost:11434/v1` and free-text local model names |
 | 10 | `README.md`, `CLAUDE.md`, `docs/superpowers/` | Documented prompt profile and Ollama architecture for future agents |
+
+## Changelog (improvements applied 2026-05-30)
+
+| # | File | Change |
+|---|------|--------|
+| 11 | `background.js` | **Tab isolation**: agent is pinned to the tab where the first message is sent; all tools execute on pinned tab, not active tab |
+| 12 | `background.js` | **switch_tab blocked**: returns error message to enforce isolation |
+| 13 | `background.js` | **new_tab forced approval**: always requires user approval even in auto mode |
+| 14 | `background.js` | **Screenshot safety**: `see_screen` and `export_screenshot` validate pinned tab is active before `captureVisibleTab` |
+| 15 | `background.js` | **evaluate_js guard**: blocks `window.open`, `location.href`, `location.assign`, `location.replace` patterns |
+| 16 | `background.js` | **CDP isolation**: `debugger.onEvent` filtered to pinned tab; `ensureDevTools` refuses non-pinned tabs |
+| 17 | `background.js` | **Session persistence**: `persistSession()`/`restoreSession()` via `chrome.storage.session` to survive SW recycling |
+| 18 | `background.js` | **Tab lifecycle**: `chat.tab_pinned`, `chat.tab_unpinned`, `chat.tab_lost` events for UI |
+| 19 | `sidepanel.html`, `sidepanel.js` | **Pinned tab badge**: visual indicator in header showing which tab the agent is operating on |
+| 20 | `sidepanel.js` | **Onboarding**: welcome message shown when chat area is empty |
+| 21 | `settings.html` | **OpenAI models fixed**: replaced fictional GPT-5.4 with real models (gpt-4o, gpt-4o-mini, o3, o3-mini) |
+| 22 | `icons/` | **Real icons**: generated 16/32/48/128px icons with Agentic branding |
+| 23 | `INSTALAR.ps1` | **Fixed**: script now uses script directory as extension source, validates manifest.json |
+| 24 | `CLAUDE.md` | Documented tab isolation, input isolation, and session persistence architecture |
+| 25 | `utils.js` | Created shared utility library containing system prompts, profiles catalog, HTML/Markdown parsers, and a structured logger |
+| 26 | `background.js`, `sidepanel.html`, `sidepanel.js` | Modularized to load and reuse shared functions from `utils.js`, removing duplicate configurations/functions |
+| 27 | `background.js` | Integrated tool execution timing metrics (elapsed ms) broadcasted to the UI |
+| 28 | `package.json`, `vitest.config.js` | Configured Vitest test suite for isolated, automated testing |
+| 29 | `tests/utils.test.js` | Implemented 17 automated unit tests for markdown rendering, HTML escaping, config resolution, and system prompts overrides |
+| 30 | `INSTALAR.ps1`, `.gitignore` | Optimized installer script and gitignore to exclude `node_modules`, `tests`, and dev configs when copying to the final extension folder |

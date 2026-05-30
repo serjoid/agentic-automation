@@ -12,3 +12,12 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Dependency directories
+node_modules/
+
+# Optional npm files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
