@@ -323,15 +323,19 @@ importScripts('utils.js');
   async function persistSession() {
     try {
       // Strip base64 vision data from messages to stay within 10 MB quota
-      const cleanHistory = session.conversationHistory.map(msg => {
+      let cleanHistory = session.conversationHistory.map(msg => {
         if (!Array.isArray(msg.content)) return msg;
         const filtered = msg.content.filter(p => p.type !== 'image_url');
         if (filtered.length === 0) return { ...msg, content: '[vision content removed for storage]' };
         return { ...msg, content: filtered };
       });
+
+      const MAX_PERSIST = 40;
+      cleanHistory = trimHistory(cleanHistory, MAX_PERSIST);
+
       await chrome.storage.session.set({
         _session: {
-          conversationHistory: cleanHistory.slice(-40),
+          conversationHistory: cleanHistory,
           pinnedTabId: session.pinnedTabId,
           pinnedTabUrl: session.pinnedTabUrl,
           consoleLogs: session.consoleLogs.slice(-50)
@@ -441,14 +445,31 @@ importScripts('utils.js');
   }
 
   function sanitizeMessages(messages, cfg) {
-    if (supportsVision(cfg)) return messages;
     return messages.map(msg => {
-      if (!Array.isArray(msg.content)) return msg;
-      const text = msg.content
-        .filter(p => p.type === 'text')
-        .map(p => p.text)
-        .join('\n');
-      return { ...msg, content: text || '[vision content removed]' };
+      // Reconstruct message strictly to avoid API 400 errors (e.g., DeepSeek rejecting reasoning_content)
+      const cleanMsg = { role: msg.role };
+      
+      // Ensure assistant messages have content: null instead of undefined
+      if (msg.role === 'assistant' && msg.content === undefined) {
+        cleanMsg.content = null;
+      } else {
+        cleanMsg.content = msg.content;
+      }
+      
+      if (msg.tool_calls) cleanMsg.tool_calls = msg.tool_calls;
+      if (msg.tool_call_id) cleanMsg.tool_call_id = msg.tool_call_id;
+      if (msg.name) cleanMsg.name = msg.name;
+
+      // Clean vision payload if model doesn't support it
+      if (!supportsVision(cfg) && Array.isArray(cleanMsg.content)) {
+        const text = cleanMsg.content
+          .filter(p => p.type === 'text')
+          .map(p => p.text)
+          .join('\n');
+        cleanMsg.content = text || '[vision content removed]';
+      }
+
+      return cleanMsg;
     });
   }
 
@@ -589,14 +610,7 @@ importScripts('utils.js');
       session.conversationHistory.push({ role: 'user', content: userMessage });
 
       const MAX_HISTORY = 60;
-      if (session.conversationHistory.length > MAX_HISTORY) {
-        let trimmed = session.conversationHistory.slice(-MAX_HISTORY);
-        // Always start at the first user message to avoid orphaned tool results
-        // that would break the tool_calls ↔ tool role contract required by the API
-        const firstUser = trimmed.findIndex(m => m.role === 'user');
-        if (firstUser > 0) trimmed = trimmed.slice(firstUser);
-        session.conversationHistory = trimmed;
-      }
+      session.conversationHistory = trimHistory(session.conversationHistory, MAX_HISTORY);
 
       const messages = [];
       if (cfg.systemPrompt) messages.push({ role: 'system', content: cfg.systemPrompt });

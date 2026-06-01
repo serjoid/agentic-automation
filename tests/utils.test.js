@@ -5,7 +5,8 @@ const {
   normalizePromptOverrides,
   resolveSystemPrompt,
   SYSTEM_PROMPT_PROFILES,
-  DEFAULT_SYSTEM_PROMPT_PROFILE
+  DEFAULT_SYSTEM_PROMPT_PROFILE,
+  trimHistory
 } = require('../utils.js');
 
 describe('escapeHtml', () => {
@@ -118,3 +119,79 @@ describe('resolveSystemPrompt', () => {
     expect(prompt).toBe(SYSTEM_PROMPT_PROFILES['data-extraction'].prompt);
   });
 });
+
+describe('trimHistory', () => {
+  test('should return empty array for empty inputs or invalid lengths', () => {
+    expect(trimHistory([], 10)).toEqual([]);
+    expect(trimHistory(null, 10)).toEqual([]);
+    expect(trimHistory([{ role: 'user', content: 'hello' }], 0)).toEqual([]);
+    expect(trimHistory([{ role: 'user', content: 'hello' }], -5)).toEqual([]);
+  });
+
+  test('should keep all messages if length is within limits and it starts with user', () => {
+    const history = [
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'hello' }
+    ];
+    expect(trimHistory(history, 10)).toEqual(history);
+  });
+
+  test('should trim leading non-user messages even if within max length', () => {
+    const history = [
+      { role: 'tool', content: 'done' },
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'hello' }
+    ];
+    expect(trimHistory(history, 10)).toEqual([
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'hello' }
+    ]);
+  });
+
+  test('should trim to user message closest to the target starting index when exceeding limit', () => {
+    const history = [
+      { role: 'user', content: '1' }, // 0
+      { role: 'assistant', content: '2' }, // 1
+      { role: 'tool', content: '3' }, // 2
+      { role: 'assistant', content: '4' }, // 3
+      { role: 'user', content: '5' }, // 4
+      { role: 'assistant', content: '6' }, // 5
+      { role: 'tool', content: '7' }, // 6
+      { role: 'user', content: '8' } // 7
+    ];
+    // length is 8. maxLen is 4. startIdx = 8 - 4 = 4.
+    // user messages are at index 0 (distance 4), index 4 (distance 0), and index 7 (distance 3).
+    // closest index is index 4.
+    // Result should slice from index 4.
+    const result = trimHistory(history, 4);
+    expect(result).toEqual([
+      { role: 'user', content: '5' },
+      { role: 'assistant', content: '6' },
+      { role: 'tool', content: '7' },
+      { role: 'user', content: '8' }
+    ]);
+  });
+
+  test('should handle case where start index lands on a tool and seeks closest user backwards', () => {
+    const history = [
+      { role: 'user', content: 'u1' }, // 0
+      { role: 'assistant', content: 'a1' }, // 1
+      { role: 'tool', content: 't1' }, // 2
+      { role: 'assistant', content: 'a2' }, // 3
+      { role: 'tool', content: 't2' } // 4
+    ];
+    // length is 5. maxLen is 3. startIdx = 5 - 3 = 2.
+    // user message is only at index 0 (distance 2).
+    // Result should slice from index 0.
+    expect(trimHistory(history, 3)).toEqual(history);
+  });
+
+  test('should return empty if no user message exists in history', () => {
+    const history = [
+      { role: 'assistant', content: 'a1' },
+      { role: 'tool', content: 't1' }
+    ];
+    expect(trimHistory(history, 5)).toEqual([]);
+  });
+});
+

@@ -421,6 +421,44 @@ const log = {
   error: (ctx, msg, data) => console.error(`[Agentic][ERROR][${ctx}]`, msg, data !== undefined ? data : '')
 };
 
+function trimHistory(history, maxLen) {
+  if (!Array.isArray(history) || history.length === 0) return [];
+  if (maxLen <= 0) return [];
+
+  // If the history is within the limit, we still want to make sure it starts with 'user'
+  if (history.length <= maxLen) {
+    const firstUser = history.findIndex(m => m.role === 'user');
+    if (firstUser > 0) {
+      return history.slice(firstUser);
+    } else if (firstUser === -1) {
+      // If there's no user message in the entire history, return empty to prevent orphaned tools
+      return [];
+    }
+    return history;
+  }
+
+  // If it exceeds maxLen, we want to slice it starting at the 'user' message closest to startIdx.
+  const startIdx = history.length - maxLen;
+  let closestIdx = -1;
+  let minDistance = Infinity;
+
+  for (let i = 0; i < history.length; i++) {
+    if (history[i].role === 'user') {
+      const distance = Math.abs(i - startIdx);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIdx = i;
+      }
+    }
+  }
+
+  if (closestIdx !== -1) {
+    return history.slice(closestIdx);
+  }
+
+  return [];
+}
+
 // ======== Module Export (Node/Test context) ==================================
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -435,6 +473,8 @@ if (typeof module !== 'undefined' && module.exports) {
     renderMarkdown,
     normalizePromptOverrides,
     resolveSystemPrompt,
-    log
+    log,
+    trimHistory
   };
 }
+
